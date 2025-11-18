@@ -1,6 +1,8 @@
 @echo off
+chcp 65001 >nul
 REM 部署到 GitHub 的批处理脚本
 REM 目标仓库: https://github.com/jhuang7908/statics
+REM 设置代码页为 UTF-8 以正确显示中文
 
 echo ========================================
 echo 部署 stat-IDE 到 GitHub

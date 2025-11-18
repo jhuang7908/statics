@@ -1,6 +1,8 @@
 @echo off
+chcp 65001 >nul
 REM 快速部署脚本 - 简化版本
 REM 目标: https://github.com/jhuang7908/statics (main 分支)
+REM 设置代码页为 UTF-8 以正确显示中文
 
 echo ========================================
 echo 快速部署到 GitHub
@@ -46,7 +48,26 @@ echo.
 echo 推送到 GitHub (main 分支)...
 echo 注意: 可能需要输入 GitHub 用户名和密码/Token
 echo.
+
+REM 设置主分支
 git branch -M main
+
+REM 先尝试拉取远程更改（如果存在）
+echo.
+echo 检查远程更改...
+git fetch origin main 2>nul
+if %errorlevel% equ 0 (
+    echo 远程仓库有内容，先合并...
+    git pull origin main --allow-unrelated-histories --no-edit 2>nul
+    if %errorlevel% neq 0 (
+        echo [警告] 合并时可能有冲突，将尝试强制推送
+        echo 如果远程内容不重要，可以使用: git push -u origin main --force
+    )
+)
+
+REM 推送
+echo.
+echo 推送到远程仓库...
 git push -u origin main
 
 echo.

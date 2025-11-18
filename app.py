@@ -424,9 +424,40 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 设置中文字体
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS']
+# 设置中文字体 - 确保正确显示中文
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
+matplotlib.rcParams['axes.unicode_minus'] = False
+# 确保字体设置生效
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
 plt.rcParams['axes.unicode_minus'] = False
+
+# 尝试设置具体的中文字体
+try:
+    # Windows 系统
+    if platform.system() == 'Windows':
+        # 尝试找到中文字体
+        import matplotlib.font_manager as fm
+        font_list = [f.name for f in fm.fontManager.ttflist]
+        chinese_fonts = ['SimHei', 'Microsoft YaHei', 'SimSun', 'KaiTi', 'FangSong']
+        for font_name in chinese_fonts:
+            if font_name in font_list:
+                plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
+                matplotlib.rcParams['font.sans-serif'] = [font_name] + matplotlib.rcParams['font.sans-serif']
+                break
+    # Linux/Mac 系统
+    else:
+        # 尝试使用系统字体
+        import matplotlib.font_manager as fm
+        font_list = [f.name for f in fm.fontManager.ttflist]
+        chinese_fonts = ['WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Noto Sans CJK SC']
+        for font_name in chinese_fonts:
+            if font_name in font_list:
+                plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
+                matplotlib.rcParams['font.sans-serif'] = [font_name] + matplotlib.rcParams['font.sans-serif']
+                break
+except:
+    pass
 
 # 初始化 session state
 if 'chat_history' not in st.session_state:
@@ -872,10 +903,23 @@ def add_pvalue_text(ax, p_val, x_pos, y_max, fontsize, show_pvalue=True, groups=
     x_pos_text = x_lim[1] * 0.98  # 右上角
     y_pos_text = y_lim[1] * 0.98  # 右上角
     
-    # 使用较小的字体显示详细信息
-    ax.text(x_pos_text, y_pos_text, display_text, 
+    # 使用较小的字体显示详细信息，确保使用支持中文的字体
+    # 如果包含中文，使用英文显示以避免字体问题
+    if groups is not None and len(groups) == 2:
+        # 对于两组比较，使用英文显示以避免字体问题
+        group1_name = str(groups[0])
+        group2_name = str(groups[1])
+        if p_val < 0.05:
+            display_text_en = f"{group1_name} vs {group2_name}\n{p_full} (p<0.05)"
+        else:
+            display_text_en = f"{group1_name} vs {group2_name}\n{p_full} (ns)"
+    else:
+        display_text_en = p_full
+    
+    ax.text(x_pos_text, y_pos_text, display_text_en, 
            fontsize=fontsize*0.85, ha='right', va='top',
-           bbox=dict(boxstyle='round,pad=0.5', facecolor='white', edgecolor='black', alpha=0.9, linewidth=0.5))
+           bbox=dict(boxstyle='round,pad=0.5', facecolor='white', edgecolor='black', alpha=0.9, linewidth=0.5),
+           family='sans-serif')  # 明确指定字体族
 
 # ==================== 图形美化主题设置函数 ====================
 def apply_plot_style(fig, ax, fontsize, linewidth, pointsize, show_legend, theme, color_scheme):
@@ -3728,6 +3772,31 @@ R² = {r_squared:.4f} 表示{x_col}能够解释{y_col}总变异的{r_squared*100
         with tab_ai:
             st.caption("🎓 Shawn · InSynBio")
             
+            # 检查 Ollama 连接状态（仅在首次加载时）
+            if 'ollama_checked' not in st.session_state:
+                try:
+                    from ollama_client import get_ollama_url
+                    ollama_url = get_ollama_url()
+                    if ollama_url == 'http://localhost:11434':
+                        # 尝试连接本地服务
+                        import requests
+                        requests.get(f"{ollama_url}/api/tags", timeout=2)
+                        st.session_state.ollama_available = True
+                    else:
+                        # 远程服务，假设可用（实际会在使用时检测）
+                        st.session_state.ollama_available = True
+                except:
+                    st.session_state.ollama_available = False
+                st.session_state.ollama_checked = True
+            
+            # 如果 Ollama 不可用，显示提示
+            if not st.session_state.get('ollama_available', True):
+                st.info("""
+                **InSynBio 正在建设制作中**
+                
+                AI 功能正在开发中，敬请期待！
+                """)
+            
             # 对话历史区域
             chat_container = st.container(height=300)
             with chat_container:
@@ -3739,19 +3808,24 @@ R² = {r_squared:.4f} 表示{x_col}能够解释{y_col}总变异的{r_squared*100
                             st.markdown(f"**🤖 AI：** {msg['content']}")
                         st.divider()
                 else:
-                    st.info("👋 你好！我是统计辅导助手，可以回答统计分析相关问题。")
+                    if st.session_state.get('ollama_available', True):
+                        st.info("👋 你好！我是统计辅导助手，可以回答统计分析相关问题。")
+                    else:
+                        st.info("👋 InSynBio 正在建设制作中，AI 功能敬请期待！")
             
             # 用户输入区
+            ollama_available = st.session_state.get('ollama_available', True)
             user_input = st.text_area(
                 "输入您的问题",
-                placeholder="例如：这个 t 检验的结果如何解释？",
+                placeholder="例如：这个 t 检验的结果如何解释？" if ollama_available else "AI 功能暂时不可用，请先配置远程 Ollama 服务器",
                 height=80,
-                key="user_input_ai"
+                key="user_input_ai",
+                disabled=not ollama_available
             )
             
             col_send, col_clear = st.columns([2, 1])
             with col_send:
-                if st.button("📤 发送", type="primary", use_container_width=True, key="send_ai"):
+                if st.button("📤 发送", type="primary", use_container_width=True, key="send_ai", disabled=not ollama_available):
                     if user_input.strip():
                         # 添加到对话历史
                         st.session_state.chat_history.append({
@@ -3781,28 +3855,38 @@ R² = {r_squared:.4f} 表示{x_col}能够解释{y_col}总变异的{r_squared*100
                                 
                                 st.rerun()
                             except TimeoutError as e:
-                                error_msg = f"⏱️ 请求超时：{str(e)}\n\n请检查 Ollama 服务是否正常运行，或稍后重试。"
-                                st.error(error_msg)
+                                friendly_msg = "**InSynBio 正在建设制作中**\n\nAI 功能正在开发中，敬请期待！"
+                                st.info(friendly_msg)
                                 st.session_state.chat_history.append({
                                     'role': 'assistant',
-                                    'content': error_msg
+                                    'content': friendly_msg
                                 })
                                 st.rerun()
                             except ConnectionError as e:
-                                error_msg = f"🔌 连接失败：{str(e)}\n\n请确保 Ollama 服务正在运行。"
-                                st.error(error_msg)
+                                friendly_msg = "**InSynBio 正在建设制作中**\n\nAI 功能正在开发中，敬请期待！"
+                                st.info(friendly_msg)
                                 st.session_state.chat_history.append({
                                     'role': 'assistant',
-                                    'content': error_msg
+                                    'content': friendly_msg
                                 })
                                 st.rerun()
                             except Exception as e:
-                                error_msg = f"❌ AI 调用失败：{str(e)}\n\n请稍后重试，或检查 Ollama 服务状态。"
-                                st.error(error_msg)
-                                st.session_state.chat_history.append({
-                                    'role': 'assistant',
-                                    'content': error_msg
-                                })
+                                # 检查是否是连接相关错误
+                                error_str = str(e).lower()
+                                if 'connection' in error_str or '连接' in error_str or 'ollama' in error_str:
+                                    friendly_msg = "**InSynBio 正在建设制作中**\n\nAI 功能正在开发中，敬请期待！"
+                                    st.info(friendly_msg)
+                                    st.session_state.chat_history.append({
+                                        'role': 'assistant',
+                                        'content': friendly_msg
+                                    })
+                                else:
+                                    error_msg = f"❌ AI 调用失败：{str(e)}\n\n请稍后重试，或检查 Ollama 服务状态。"
+                                    st.error(error_msg)
+                                    st.session_state.chat_history.append({
+                                        'role': 'assistant',
+                                        'content': error_msg
+                                    })
                                 st.rerun()
             
             with col_clear:
