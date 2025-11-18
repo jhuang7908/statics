@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="{{ language }}">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{ titles.title }}</title>
+    <style>
+      body {
+        font-family: "Noto Sans", "Microsoft YaHei", sans-serif;
+        margin: 2rem;
+        color: #1f2933;
+      }
+      h1 {
+        font-size: 2rem;
+      }
+      h2 {
+        margin-top: 1.5rem;
+        font-size: 1.5rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+      }
+      table, th, td {
+        border: 1px solid #d2d6dc;
+      }
+      th, td {
+        padding: 0.5rem;
+        text-align: left;
+      }
+      .code-block {
+        background-color: #f5f7fa;
+        padding: 1rem;
+        border-radius: 8px;
+        font-family: "Fira Code", monospace;
+        white-space: pre-wrap;
+      }
+      .chart {
+        margin-top: 1rem;
+        text-align: center;
+      }
+      footer {
+        margin-top: 2rem;
+        font-size: 0.9rem;
+        color: #52606d;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>{{ titles.title }}</h1>
+    <p>{{ titles.subtitle }}</p>
+
+    <h2>{{ sections.overview }}</h2>
+    <p>{{ overview_text }}</p>
+
+    <h2>{{ sections.statistics }}</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>{{ table_headers.metric }}</th>
+          <th>{{ table_headers.value }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for key, value in statistics.items() %}
+        <tr>
+          <td>{{ key }}</td>
+          <td>{{ value }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if explanation %}
+    <h2>{{ sections.explanation }}</h2>
+    <p>{{ explanation }}</p>
+    {% endif %}
+
+    <h2>{{ sections.code }}</h2>
+    <div class="code-block">{{ code }}</div>
+
+    {% if chart_path %}
+    <h2>{{ sections.chart }}</h2>
+    <div class="chart">
+      <img src="{{ chart_path }}" alt="Chart" width="500" />
+    </div>
+    {% endif %}
+
+    <footer>
+      <p>{{ footer }}</p>
+    </footer>
+  </body>
+</html>
+
+
