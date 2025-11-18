@@ -49,27 +49,53 @@ if %errorlevel% neq 0 (
 
 echo.
 echo [5/5] 推送到 GitHub...
+echo.
+echo 设置主分支为 main...
 git branch -M main
+echo.
+
+echo 推送到远程仓库...
+echo 注意: 如果是第一次推送，可能需要输入 GitHub 用户名和密码/Token
+echo.
 git push -u origin main
 
 echo.
 echo ========================================
 if %errorlevel% equ 0 (
-    echo 部署成功！
+    echo [成功] 部署成功！
+    echo.
     echo 仓库地址: https://github.com/jhuang7908/statics
+    echo 分支: main
     echo.
     echo 下一步: 在 Streamlit Community Cloud 部署
     echo 1. 访问 https://share.streamlit.io/
     echo 2. 使用 GitHub 账号登录
     echo 3. 选择仓库: jhuang7908/statics
-    echo 4. 主文件: app.py
-    echo 5. 点击 Deploy
+    echo 4. 分支: main
+    echo 5. 主文件: app.py
+    echo 6. 点击 Deploy
+    echo.
+    echo 验证上传: 访问 https://github.com/jhuang7908/statics 查看文件
 ) else (
-    echo 部署失败，请检查错误信息
+    echo [失败] 部署失败，请检查错误信息
+    echo.
     echo 可能的原因:
-    echo - GitHub 仓库不存在或没有权限
-    echo - 需要先创建仓库: https://github.com/jhuang7908/statics
-    echo - 需要配置 GitHub 认证
+    echo 1. GitHub 仓库不存在 - 请先创建: https://github.com/new
+    echo    仓库名: statics
+    echo    所有者: jhuang7908
+    echo.
+    echo 2. 没有权限 - 检查是否有仓库访问权限
+    echo.
+    echo 3. 认证失败 - 需要使用 Personal Access Token
+    echo    生成 Token: https://github.com/settings/tokens
+    echo    权限: repo (全部)
+    echo.
+    echo 4. 网络问题 - 检查网络连接
+    echo.
+    echo 如果仓库不存在，请先创建:
+    echo https://github.com/new
+    echo 仓库名: statics
+    echo 不要勾选 "Initialize with README"
 )
 echo ========================================
 pause
