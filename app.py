@@ -426,10 +426,12 @@ st.markdown("""
 
 # 设置中文字体 - 确保正确显示中文
 import matplotlib
-matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
+import matplotlib.font_manager as fm
+
+# 强制设置中文字体
+matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'KaiTi', 'FangSong', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
 matplotlib.rcParams['axes.unicode_minus'] = False
-# 确保字体设置生效
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'KaiTi', 'FangSong', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
 plt.rcParams['axes.unicode_minus'] = False
 
 # 尝试设置具体的中文字体
@@ -437,26 +439,33 @@ try:
     # Windows 系统
     if platform.system() == 'Windows':
         # 尝试找到中文字体
-        import matplotlib.font_manager as fm
         font_list = [f.name for f in fm.fontManager.ttflist]
         chinese_fonts = ['SimHei', 'Microsoft YaHei', 'SimSun', 'KaiTi', 'FangSong']
         for font_name in chinese_fonts:
             if font_name in font_list:
-                plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
-                matplotlib.rcParams['font.sans-serif'] = [font_name] + matplotlib.rcParams['font.sans-serif']
-                break
+                # 找到字体文件路径
+                font_path = None
+                for font_file in fm.fontManager.ttflist:
+                    if font_file.name == font_name:
+                        font_path = font_file.fname
+                        break
+                if font_path:
+                    # 强制设置字体
+                    plt.rcParams['font.sans-serif'] = [font_name] + [f for f in plt.rcParams['font.sans-serif'] if f != font_name]
+                    matplotlib.rcParams['font.sans-serif'] = [font_name] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != font_name]
+                    break
     # Linux/Mac 系统
     else:
         # 尝试使用系统字体
-        import matplotlib.font_manager as fm
         font_list = [f.name for f in fm.fontManager.ttflist]
         chinese_fonts = ['WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Noto Sans CJK SC']
         for font_name in chinese_fonts:
             if font_name in font_list:
-                plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
-                matplotlib.rcParams['font.sans-serif'] = [font_name] + matplotlib.rcParams['font.sans-serif']
+                plt.rcParams['font.sans-serif'] = [font_name] + [f for f in plt.rcParams['font.sans-serif'] if f != font_name]
+                matplotlib.rcParams['font.sans-serif'] = [font_name] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != font_name]
                 break
-except:
+except Exception as e:
+    # 如果设置失败，使用默认设置
     pass
 
 # 初始化 session state
@@ -1922,364 +1931,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
     # ==================== 中间主区（图 + 结果） ====================
     with col_main:
         try:
-            # 图形优化折叠面板（默认展开，方便查看图形）
-            with st.expander("🎨 图形优化设置", expanded=True):
-                # 使用更紧凑的布局，减少垂直空间
-                col_style1, col_style2, col_style3 = st.columns(3)
-                
-                with col_style1:
-                    st.session_state.plot_fontsize = st.slider(
-                        "字体大小 (pt)", 
-                        min_value=8, 
-                        max_value=20, 
-                        value=st.session_state.plot_fontsize,
-                        step=1,
-                        key="fontsize_slider",
-                        help="控制图形中所有文字的大小"
-                    )
-                    st.session_state.plot_linewidth = st.slider(
-                        "轴线宽度", 
-                        min_value=0.5, 
-                        max_value=3.0, 
-                        value=st.session_state.plot_linewidth,
-                        step=0.1,
-                        key="linewidth_slider",
-                        help="控制坐标轴和线条的粗细"
-                    )
-                    st.session_state.plot_pointsize = st.slider(
-                        "点大小", 
-                        min_value=20, 
-                        max_value=200, 
-                        value=st.session_state.plot_pointsize,
-                        step=10,
-                        key="pointsize_slider",
-                        help="控制散点图中点的大小（数值越大点越大）"
-                    )
-                    
-                    # 坐标轴设置（放在字体、数值、点大小下面，更紧凑）
-                    st.markdown("---")
-                    st.markdown("**坐标轴设置**")
-                    col_axis1, col_axis2 = st.columns(2)
-                    
-                    with col_axis1:
-                        st.session_state.x_scale = st.selectbox(
-                            "X轴刻度",
-                            ["线性", "对数", "科学计数法"],
-                            index=["线性", "对数", "科学计数法"].index(
-                                st.session_state.get('x_scale', "线性") if st.session_state.get('x_scale', "线性") in 
-                                ["线性", "对数", "科学计数法"] else "线性"
-                            ),
-                            key="x_scale_selectbox",
-                            help="X轴的数值表示方式"
-                        )
-                        # 初始化checkbox状态
-                        if 'use_x_range_checkbox' not in st.session_state:
-                            st.session_state.use_x_range_checkbox = False
-                        
-                        use_x_range = st.checkbox("设置X轴范围", value=st.session_state.use_x_range_checkbox, key="use_x_range_checkbox")
-                        
-                        # 如果checkbox状态改变，更新session_state
-                        if use_x_range != st.session_state.get('_prev_x_range', False):
-                            st.session_state._prev_x_range = use_x_range
-                            if not use_x_range:
-                                # 取消选中时自动清除数值
-                                st.session_state.x_min = None
-                                st.session_state.x_max = None
-                        
-                        if use_x_range:
-                            col_x_min, col_x_max = st.columns(2)
-                            with col_x_min:
-                                x_min_val = st.session_state.get('x_min')
-                                if x_min_val is None:
-                                    x_min_val = 0.0
-                                st.session_state.x_min = st.number_input(
-                                    "X最小值", 
-                                    value=float(x_min_val), 
-                                    key="x_min_input", 
-                                    format="%.3f",
-                                    step=0.1,
-                                    help="X轴的最小值"
-                                )
-                            with col_x_max:
-                                x_max_val = st.session_state.get('x_max')
-                                if x_max_val is None:
-                                    x_max_val = 10.0
-                                st.session_state.x_max = st.number_input(
-                                    "X最大值",
-                                    value=float(x_max_val),
-                                    key="x_max_input",
-                                    format="%.3f",
-                                    step=0.1,
-                                    help="X轴的最大值"
-                                )
-                        else:
-                            # 确保数值被清除
-                            st.session_state.x_min = None
-                            st.session_state.x_max = None
-                    
-                    with col_axis2:
-                        st.session_state.y_scale = st.selectbox(
-                            "Y轴刻度",
-                            ["线性", "对数", "科学计数法"],
-                            index=["线性", "对数", "科学计数法"].index(
-                                st.session_state.get('y_scale', "线性") if st.session_state.get('y_scale', "线性") in 
-                                ["线性", "对数", "科学计数法"] else "线性"
-                            ),
-                            key="y_scale_selectbox",
-                            help="Y轴的数值表示方式"
-                        )
-                        # 初始化checkbox状态
-                        if 'use_y_range_checkbox' not in st.session_state:
-                            st.session_state.use_y_range_checkbox = False
-                        
-                        use_y_range = st.checkbox("设置Y轴范围", value=st.session_state.use_y_range_checkbox, key="use_y_range_checkbox")
-                        
-                        # 如果checkbox状态改变，更新session_state
-                        if use_y_range != st.session_state.get('_prev_y_range', False):
-                            st.session_state._prev_y_range = use_y_range
-                            if not use_y_range:
-                                # 取消选中时自动清除数值
-                                st.session_state.y_min = None
-                                st.session_state.y_max = None
-                        
-                        if use_y_range:
-                            col_y_min, col_y_max = st.columns(2)
-                            with col_y_min:
-                                y_min_val = st.session_state.get('y_min')
-                                if y_min_val is None:
-                                    y_min_val = 0.0
-                                st.session_state.y_min = st.number_input(
-                                    "Y最小值",
-                                    value=float(y_min_val),
-                                    key="y_min_input",
-                                    format="%.3f",
-                                    step=0.1,
-                                    help="Y轴的最小值"
-                                )
-                            with col_y_max:
-                                y_max_val = st.session_state.get('y_max')
-                                if y_max_val is None:
-                                    y_max_val = 10.0
-                                st.session_state.y_max = st.number_input(
-                                    "Y最大值",
-                                    value=float(y_max_val),
-                                    key="y_max_input",
-                                    format="%.3f",
-                                    step=0.1,
-                                    help="Y轴的最大值"
-                                )
-                        else:
-                            # 确保数值被清除
-                            st.session_state.y_min = None
-                            st.session_state.y_max = None
-                    
-                    # 坐标轴重置按钮（放在坐标轴设置区域下方）
-                    st.markdown("---")
-                    reset_axis_btn = st.button("🔄 重置坐标轴设置", key="reset_axis_btn", help="重置坐标轴设置为默认值（线性刻度，无范围限制）", use_container_width=True)
-                    if reset_axis_btn:
-                        # 重置所有坐标轴相关设置
-                        st.session_state.x_scale = "线性"
-                        st.session_state.y_scale = "线性"
-                        st.session_state.x_min = None
-                        st.session_state.x_max = None
-                        st.session_state.y_min = None
-                        st.session_state.y_max = None
-                        # 使用删除key的方式来重置checkbox（在下次渲染时会使用默认值）
-                        if 'use_x_range_checkbox' in st.session_state:
-                            del st.session_state['use_x_range_checkbox']
-                        if 'use_y_range_checkbox' in st.session_state:
-                            del st.session_state['use_y_range_checkbox']
-                        # 清除之前的checkbox状态记录
-                        if '_prev_x_range' in st.session_state:
-                            del st.session_state['_prev_x_range']
-                        if '_prev_y_range' in st.session_state:
-                            del st.session_state['_prev_y_range']
-                        st.rerun()
-                
-                with col_style2:
-                    st.session_state.plot_show_legend = st.checkbox(
-                        "显示图例", 
-                        value=st.session_state.plot_show_legend,
-                        key="legend_checkbox",
-                        help="是否在图形上显示图例说明"
-                    )
-                    st.session_state.plot_theme = st.selectbox(
-                        "主题风格",
-                        ["基础风格（Basic）", "自然风格（Nature-like）", "演示风格（Presentation）"],
-                        index=["基础风格（Basic）", "自然风格（Nature-like）", "演示风格（Presentation）"].index(
-                            st.session_state.plot_theme if st.session_state.plot_theme in 
-                            ["基础风格（Basic）", "自然风格（Nature-like）", "演示风格（Presentation）"] 
-                            else "自然风格（Nature-like）"
-                        ),
-                        key="theme_selectbox",
-                        help="基础风格：经典配色；自然风格：适合学术发表；演示风格：更鲜艳醒目"
-                    )
-                    st.session_state.plot_color_scheme = st.selectbox(
-                        "主色调",
-                        ["蓝色系", "绿色系", "橙色系", "紫色系", "黑白灰系", "经典配色"],
-                        index=["蓝色系", "绿色系", "橙色系", "紫色系", "黑白灰系", "经典配色"].index(
-                            st.session_state.plot_color_scheme if st.session_state.plot_color_scheme in 
-                            ["蓝色系", "绿色系", "橙色系", "紫色系", "黑白灰系", "经典配色"] else "蓝色系"
-                        ),
-                        key="color_scheme_selectbox",
-                        help="选择图形的主要颜色方案（黑白灰系适合黑白打印）"
-                    )
-                    # 图形大小设置（带reset按钮）
-                    st.markdown("**图形大小**")
-                    st.session_state.plot_width = st.slider(
-                        "图形宽度 (英寸)",
-                        min_value=1.0,
-                        max_value=15.0,
-                        value=st.session_state.plot_width,
-                        step=0.5,
-                        key="plot_width_slider",
-                        help="控制图形的宽度，单位：英寸（建议4-8英寸）"
-                    )
-                    st.session_state.plot_height = st.slider(
-                        "图形高度 (英寸)",
-                        min_value=1.0,
-                        max_value=10.0,
-                        value=st.session_state.plot_height,
-                        step=0.5,
-                        key="plot_height_slider",
-                        help="控制图形的高度，单位：英寸（建议3-6英寸）"
-                    )
-                    # 重置按钮放在下面，横向
-                    if st.button("重置大小", key="reset_size_btn", help="重置为默认大小（宽度6.0英寸，高度4.5英寸）", use_container_width=True):
-                        st.session_state.plot_width = 6.0
-                        st.session_state.plot_height = 4.5
-                        st.rerun()
-                
-                with col_style3:
-                    # 图形比例选择
-                    st.session_state.plot_aspect = st.selectbox(
-                        "图形比例",
-                        ["宽（横向）", "正方形", "高（纵向）"],
-                        index=["宽（横向）", "正方形", "高（纵向）"].index(
-                            st.session_state.plot_aspect if st.session_state.plot_aspect in 
-                            ["宽（横向）", "正方形", "高（纵向）"] else "正方形"
-                        ),
-                        key="plot_aspect_selectbox",
-                        help="选择图形的宽高比例"
-                    )
-                    
-                    # 根据任务类型显示不同的图形选择（只显示单一图形，不显示组合）
-                    # 可以加误差线的图形默认都加误差线
-                    if task in ["两组比较（t 检验 / Mann–Whitney）", "多组比较（单因素 ANOVA）"]:
-                        plot_options = [
-                            "箱线图", "小提琴图", "条形图+误差线", 
-                            "直方图", "密度曲线图", "点图+误差线"
-                        ]
-                    elif task == "相关性分析（Pearson / Spearman）":
-                        plot_options = [
-                            "散点图+趋势线", "散点图", "密度图", 
-                            "散点图+置信区间", "六边形密度图"
-                        ]
-                    else:  # 线性回归
-                        plot_options = [
-                            "散点图+回归线", "散点图", "残差图",
-                            "散点图+置信区间", "Q-Q图"
-                        ]
-                    
-                    # 如果当前选择的图形类型不在当前任务的选项中，重置为默认值
-                    if st.session_state.plot_type not in plot_options:
-                        st.session_state.plot_type = plot_options[0]
-                    
-                    st.session_state.plot_type = st.selectbox(
-                        "图形类型",
-                        plot_options,
-                        index=plot_options.index(st.session_state.plot_type) if st.session_state.plot_type in plot_options else 0,
-                        key="plot_type_selectbox",
-                        help="选择要显示的图形类型（一次只显示一张图）"
-                    )
-                    
-                    # 图形宽度和间距控制（所有图形类型）
-                    if "条形图" in st.session_state.plot_type:
-                        st.session_state.bar_width = st.slider(
-                            "柱子宽度",
-                            min_value=0.3,
-                            max_value=0.95,
-                            value=st.session_state.bar_width,
-                            step=0.05,
-                            key="bar_width_slider",
-                            help="控制每个柱子的宽度（0.3-0.95，建议0.6-0.8，符合出版要求）"
-                        )
-                        st.session_state.bar_spacing = st.slider(
-                            "组间间距",
-                            min_value=0.1,
-                            max_value=1.0,
-                            value=st.session_state.bar_spacing,
-                            step=0.1,
-                            key="bar_spacing_slider",
-                            help="控制不同组之间的间距（0.1-1.0，建议0.2-0.5，数值越大间距越大）"
-                        )
-                    elif "箱线图" in st.session_state.plot_type:
-                        st.session_state.box_width = st.slider(
-                            "箱线宽度",
-                            min_value=0.3,
-                            max_value=0.9,
-                            value=st.session_state.box_width,
-                            step=0.05,
-                            key="box_width_slider",
-                            help="控制箱线图的宽度（0.3-0.9，建议0.5-0.7）"
-                        )
-                        st.session_state.box_spacing = st.slider(
-                            "组间间距",
-                            min_value=0.1,
-                            max_value=1.0,
-                            value=st.session_state.box_spacing,
-                            step=0.1,
-                            key="box_spacing_slider",
-                            help="控制不同组之间的间距（0.1-1.0，建议0.2-0.5）"
-                        )
-                    elif "小提琴图" in st.session_state.plot_type:
-                        st.session_state.violin_width = st.slider(
-                            "小提琴宽度",
-                            min_value=0.3,
-                            max_value=1.0,
-                            value=st.session_state.violin_width,
-                            step=0.05,
-                            key="violin_width_slider",
-                            help="控制小提琴图的宽度（0.3-1.0，建议0.6-0.8）"
-                        )
-                        st.session_state.violin_spacing = st.slider(
-                            "组间间距",
-                            min_value=0.1,
-                            max_value=1.0,
-                            value=st.session_state.violin_spacing,
-                            step=0.1,
-                            key="violin_spacing_slider",
-                            help="控制不同组之间的间距（0.1-1.0，建议0.2-0.5）"
-                        )
-                    elif "点图" in st.session_state.plot_type:
-                        st.session_state.dot_width = st.slider(
-                            "点大小",
-                            min_value=0.3,
-                            max_value=1.0,
-                            value=st.session_state.dot_width,
-                            step=0.1,
-                            key="dot_width_slider",
-                            help="控制点图标记的大小（0.3-1.0）"
-                        )
-                        st.session_state.dot_spacing = st.slider(
-                            "组间间距",
-                            min_value=0.1,
-                            max_value=1.0,
-                            value=st.session_state.dot_spacing,
-                            step=0.1,
-                            key="dot_spacing_slider",
-                            help="控制不同组之间的间距（0.1-1.0，建议0.2-0.5）"
-                        )
-                    
-                    # P值显示选项（放在组间距下面）
-                    st.session_state.show_pvalue = st.checkbox(
-                        "显示P值",
-                        value=st.session_state.show_pvalue,
-                        key="show_pvalue_checkbox",
-                        help="是否在图形上显示P值（符合发表要求的位置和样式）"
-                    )
-            
-            # 获取美化参数
+            # 先获取美化参数（用于绘图）
             fontsize = st.session_state.plot_fontsize
             linewidth = st.session_state.plot_linewidth
             pointsize = st.session_state.plot_pointsize
@@ -2303,26 +1955,22 @@ if st.session_state.current_df is not None and st.session_state.current_task:
             
             # 根据图形比例调整实际尺寸
             if "宽" in plot_aspect or "横向" in plot_aspect:
-                # 横向：宽高比约 4:3 或 16:9
                 plot_width = base_width * 1.3
                 plot_height = base_height * 0.9
             elif "高" in plot_aspect or "纵向" in plot_aspect:
-                # 纵向：宽高比约 3:4
                 plot_width = base_width * 0.9
                 plot_height = base_height * 1.3
             else:  # 正方形
-                # 正方形：宽高相等
                 plot_width = base_width
-                plot_height = base_height  # 使用实际高度，而不是强制使用宽度
+                plot_height = base_height
             
             # 根据图形尺寸比例动态调整字体大小
-            # 基准尺寸：6.0 x 4.5 英寸，基准字体：10pt
-            base_size = 6.0 * 4.5  # 基准面积
-            current_size = plot_width * plot_height  # 当前面积
-            size_ratio = np.sqrt(current_size / base_size)  # 使用平方根，使字体变化更平滑
-            # 确保字体大小随图形大小变化，最小不小于基准字体的0.5倍，最大不超过2倍
+            base_size = 6.0 * 4.5
+            current_size = plot_width * plot_height
+            size_ratio = np.sqrt(current_size / base_size)
             adjusted_fontsize = max(fontsize * 0.5, min(fontsize * 2.0, fontsize * size_ratio))
             
+            # 先执行分析和绘图（优先显示图形）
             # 根据任务执行分析和绘图
             if task == "两组比较（t 检验 / Mann–Whitney）":
                 value_col = params.get('value_col')
@@ -3776,26 +3424,18 @@ R² = {r_squared:.4f} 表示{x_col}能够解释{y_col}总变异的{r_squared*100
             if 'ollama_checked' not in st.session_state:
                 try:
                     from ollama_client import get_ollama_url
+                    import requests
                     ollama_url = get_ollama_url()
-                    if ollama_url == 'http://localhost:11434':
-                        # 尝试连接本地服务
-                        import requests
-                        requests.get(f"{ollama_url}/api/tags", timeout=2)
+                    # 测试连接（本地和远程都测试）
+                    response = requests.get(f"{ollama_url}/api/tags", timeout=5)
+                    if response.status_code == 200:
                         st.session_state.ollama_available = True
                     else:
-                        # 远程服务，假设可用（实际会在使用时检测）
-                        st.session_state.ollama_available = True
-                except:
+                        st.session_state.ollama_available = False
+                except Exception as e:
+                    # 连接失败，设置为不可用
                     st.session_state.ollama_available = False
                 st.session_state.ollama_checked = True
-            
-            # 如果 Ollama 不可用，显示提示
-            if not st.session_state.get('ollama_available', True):
-                st.info("""
-                **InSynBio 正在建设制作中**
-                
-                AI 功能正在开发中，敬请期待！
-                """)
             
             # 对话历史区域
             chat_container = st.container(height=300)
@@ -3811,7 +3451,11 @@ R² = {r_squared:.4f} 表示{x_col}能够解释{y_col}总变异的{r_squared*100
                     if st.session_state.get('ollama_available', True):
                         st.info("👋 你好！我是统计辅导助手，可以回答统计分析相关问题。")
                     else:
-                        st.info("👋 InSynBio 正在建设制作中，AI 功能敬请期待！")
+                        st.info("""
+                        **InSynBio 正在建设制作中**
+                        
+                        AI 功能正在开发中，敬请期待！
+                        """)
             
             # 用户输入区
             ollama_available = st.session_state.get('ollama_available', True)
