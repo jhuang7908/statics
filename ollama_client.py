@@ -66,7 +66,7 @@ def ask_model(prompt: str, system_prompt: str = "", max_retries: int = 2, timeou
     
     # 请求载荷
     payload = {
-        "model": "phi3:mini",
+        "model": "tinyllama",  # 使用 tinyllama 模型（适合 2GB 内存服务器）
         "messages": messages,
         "stream": False  # 非流式响应
     }
@@ -103,7 +103,7 @@ def ask_model(prompt: str, system_prompt: str = "", max_retries: int = 2, timeou
                 f"无法连接到 Ollama 服务（{OLLAMA_API_URL}）。请确保：\n"
                 "1. Ollama 已安装并正在运行\n"
                 f"2. 服务地址为 {OLLAMA_API_URL}\n"
-                "3. 模型 phi3:mini 已下载（运行：ollama pull phi3:mini）\n"
+                "3. 模型 tinyllama 已下载（运行：ollama pull tinyllama）\n"
                 "提示：在 Streamlit Cloud 部署时，需要配置远程 Ollama 服务地址"
             )
             if attempt < max_retries:
