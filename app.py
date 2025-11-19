@@ -435,38 +435,60 @@ plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'KaiTi
 plt.rcParams['axes.unicode_minus'] = False
 
 # 尝试设置具体的中文字体
-try:
-    # Windows 系统
-    if platform.system() == 'Windows':
-        # 尝试找到中文字体
+def setup_chinese_font():
+    """设置中文字体，确保中文能正确显示"""
+    try:
         font_list = [f.name for f in fm.fontManager.ttflist]
-        chinese_fonts = ['SimHei', 'Microsoft YaHei', 'SimSun', 'KaiTi', 'FangSong']
-        for font_name in chinese_fonts:
-            if font_name in font_list:
-                # 找到字体文件路径
-                font_path = None
-                for font_file in fm.fontManager.ttflist:
-                    if font_file.name == font_name:
-                        font_path = font_file.fname
-                        break
-                if font_path:
-                    # 强制设置字体
+        
+        # Windows 系统
+        if platform.system() == 'Windows':
+            chinese_fonts = ['SimHei', 'Microsoft YaHei', 'SimSun', 'KaiTi', 'FangSong']
+            for font_name in chinese_fonts:
+                if font_name in font_list:
+                    font_path = None
+                    for font_file in fm.fontManager.ttflist:
+                        if font_file.name == font_name:
+                            font_path = font_file.fname
+                            break
+                    if font_path:
+                        plt.rcParams['font.sans-serif'] = [font_name] + [f for f in plt.rcParams['font.sans-serif'] if f != font_name]
+                        matplotlib.rcParams['font.sans-serif'] = [font_name] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != font_name]
+                        return font_name
+        # Linux/Mac 系统
+        else:
+            # 尝试使用系统字体
+            chinese_fonts = ['WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Noto Sans CJK SC', 'Noto Sans CJK TC', 
+                           'Source Han Sans CN', 'Source Han Sans SC', 'Droid Sans Fallback']
+            for font_name in chinese_fonts:
+                if font_name in font_list:
                     plt.rcParams['font.sans-serif'] = [font_name] + [f for f in plt.rcParams['font.sans-serif'] if f != font_name]
                     matplotlib.rcParams['font.sans-serif'] = [font_name] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != font_name]
-                    break
-    # Linux/Mac 系统
-    else:
-        # 尝试使用系统字体
-        font_list = [f.name for f in fm.fontManager.ttflist]
-        chinese_fonts = ['WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Noto Sans CJK SC']
-        for font_name in chinese_fonts:
-            if font_name in font_list:
-                plt.rcParams['font.sans-serif'] = [font_name] + [f for f in plt.rcParams['font.sans-serif'] if f != font_name]
-                matplotlib.rcParams['font.sans-serif'] = [font_name] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != font_name]
-                break
-except Exception as e:
-    # 如果设置失败，使用默认设置
-    pass
+                    return font_name
+            
+            # 如果找不到中文字体，尝试下载或使用备选方案
+            # 在 Streamlit Cloud 环境中，可能需要安装字体包
+            # 这里我们使用一个通用的解决方案：使用支持 Unicode 的字体
+            unicode_fonts = ['DejaVu Sans', 'Liberation Sans', 'Arial Unicode MS']
+            for font_name in unicode_fonts:
+                if font_name in font_list:
+                    plt.rcParams['font.sans-serif'] = [font_name] + [f for f in plt.rcParams['font.sans-serif'] if f != font_name]
+                    matplotlib.rcParams['font.sans-serif'] = [font_name] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != font_name]
+                    return font_name
+        
+        # 如果都找不到，至少确保设置了字体列表
+        if not any('SimHei' in f or 'YaHei' in f or 'WenQuanYi' in f or 'Noto' in f for f in plt.rcParams['font.sans-serif']):
+            # 添加一些可能支持中文的字体到列表
+            plt.rcParams['font.sans-serif'].insert(0, 'DejaVu Sans')
+            matplotlib.rcParams['font.sans-serif'].insert(0, 'DejaVu Sans')
+        
+        return None
+    except Exception as e:
+        # 如果设置失败，使用默认设置
+        pass
+    return None
+
+# 执行字体设置
+CHINESE_FONT_NAME_PLOT = setup_chinese_font()
 
 # 初始化 session state
 if 'chat_history' not in st.session_state:
@@ -931,6 +953,19 @@ def add_pvalue_text(ax, p_val, x_pos, y_max, fontsize, show_pvalue=True, groups=
            family='sans-serif')  # 明确指定字体族
 
 # ==================== 图形美化主题设置函数 ====================
+def ensure_chinese_font():
+    """确保中文字体已正确设置，在每次绘图前调用"""
+    try:
+        # 重新检查并设置字体
+        if CHINESE_FONT_NAME_PLOT:
+            plt.rcParams['font.sans-serif'] = [CHINESE_FONT_NAME_PLOT] + [f for f in plt.rcParams['font.sans-serif'] if f != CHINESE_FONT_NAME_PLOT]
+            matplotlib.rcParams['font.sans-serif'] = [CHINESE_FONT_NAME_PLOT] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != CHINESE_FONT_NAME_PLOT]
+        # 确保负号正常显示
+        plt.rcParams['axes.unicode_minus'] = False
+        matplotlib.rcParams['axes.unicode_minus'] = False
+    except:
+        pass
+
 def apply_plot_style(fig, ax, fontsize, linewidth, pointsize, show_legend, theme, color_scheme):
     """应用图形美化参数"""
     # 根据颜色方案选择基础颜色
@@ -2096,6 +2131,9 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                     }
                     st.subheader(plot_title_map.get(plot_type, "📈 统计图形"))
                     
+                    # 确保中文字体正确设置
+                    ensure_chinese_font()
+                    
                     # 只显示一张图
                     fig, ax = plt.subplots(1, 1, figsize=(plot_width, plot_height))
                     
@@ -2435,6 +2473,9 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                     }
                     st.markdown(f"#### {plot_title_map.get(plot_type, '📈 多组统计图形')}")
                     
+                    # 确保中文字体正确设置
+                    ensure_chinese_font()
+                    
                     # 只显示一张图
                     fig, ax = plt.subplots(1, 1, figsize=(plot_width, plot_height))
                     
@@ -2734,6 +2775,9 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                     
                     st.markdown("#### 📈 散点图与趋势线")
                     
+                    # 确保中文字体正确设置
+                    ensure_chinese_font()
+                    
                     # 单图时使用完整尺寸，并居中显示
                     fig, ax = plt.subplots(figsize=(plot_width, plot_height))
                     colors = apply_plot_style(fig, ax, adjusted_fontsize, linewidth, pointsize, show_legend, theme, color_scheme)
@@ -2902,6 +2946,9 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                         st.stop()
                     
                     st.markdown("#### 📈 回归散点图与拟合直线")
+                    
+                    # 确保中文字体正确设置
+                    ensure_chinese_font()
                     
                     # 单图时使用完整尺寸，并居中显示
                     fig, ax = plt.subplots(figsize=(plot_width, plot_height))
