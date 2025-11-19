@@ -27,7 +27,7 @@ def get_ollama_url():
 # 全局变量存储 API 地址
 OLLAMA_API_URL = get_ollama_url()
 
-def ask_model(prompt: str, system_prompt: str = "", max_retries: int = 2, timeout: int = 120) -> str:
+def ask_model(prompt: str, system_prompt: str = "", max_retries: int = 2, timeout: int = 180) -> str:
     """
     向 Ollama 模型发送请求并获取回复（带重试机制）
     
@@ -35,7 +35,7 @@ def ask_model(prompt: str, system_prompt: str = "", max_retries: int = 2, timeou
         prompt: 用户输入的问题/提示
         system_prompt: 系统提示词（可选）
         max_retries: 最大重试次数（默认2次）
-        timeout: 请求超时时间（秒，默认120秒）
+        timeout: 请求超时时间（秒，默认180秒）
     
     返回:
         str: 模型的回复文本

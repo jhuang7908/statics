@@ -3487,10 +3487,10 @@ R² = {r_squared:.4f} 表示{x_col}能够解释{y_col}总变异的{r_squared*100
                             context += f"解释：{result['explanation_zh']}\n"
                         
                         # 使用 spinner 显示加载状态
-                        with st.spinner("🤖 AI 正在思考中，请稍候..."):
+                        with st.spinner("🤖 AI 正在思考中，请稍候...（可能需要 30-60 秒）"):
                             try:
                                 full_prompt = f"{context}\n\n用户问题：{user_input}"
-                                ai_response = ask_model(full_prompt, max_retries=2, timeout=120)
+                                ai_response = ask_model(full_prompt, max_retries=1, timeout=180)
                                 
                                 st.session_state.chat_history.append({
                                     'role': 'assistant',
