@@ -438,6 +438,42 @@ plt.rcParams['axes.unicode_minus'] = False
 def setup_chinese_font():
     """设置中文字体，确保中文能正确显示"""
     try:
+        # 首先尝试下载并安装中文字体（适用于 Streamlit Cloud）
+        try:
+            import urllib.request
+            import tempfile
+            import shutil
+            
+            # 尝试下载 Noto Sans CJK SC 字体（Google 开源中文字体）
+            font_url = "https://github.com/google/fonts/raw/main/ofl/notosanscjksc/NotoSansCJKsc-Regular.otf"
+            font_dir = os.path.join(os.path.dirname(__file__), 'fonts')
+            os.makedirs(font_dir, exist_ok=True)
+            font_path = os.path.join(font_dir, 'NotoSansCJKsc-Regular.otf')
+            
+            # 如果字体文件不存在，尝试下载
+            if not os.path.exists(font_path):
+                try:
+                    with urllib.request.urlopen(font_url, timeout=10) as response:
+                        with open(font_path, 'wb') as f:
+                            f.write(response.read())
+                    # 注册字体
+                    fm.fontManager.addfont(font_path)
+                    prop = fm.FontProperties(fname=font_path)
+                    plt.rcParams['font.sans-serif'] = [prop.get_name()] + [f for f in plt.rcParams['font.sans-serif'] if f != prop.get_name()]
+                    matplotlib.rcParams['font.sans-serif'] = [prop.get_name()] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != prop.get_name()]
+                    return prop.get_name()
+                except:
+                    pass
+            else:
+                # 如果字体文件已存在，直接使用
+                prop = fm.FontProperties(fname=font_path)
+                plt.rcParams['font.sans-serif'] = [prop.get_name()] + [f for f in plt.rcParams['font.sans-serif'] if f != prop.get_name()]
+                matplotlib.rcParams['font.sans-serif'] = [prop.get_name()] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != prop.get_name()]
+                return prop.get_name()
+        except:
+            pass
+        
+        # 如果下载失败，尝试使用系统字体
         font_list = [f.name for f in fm.fontManager.ttflist]
         
         # Windows 系统
@@ -464,22 +500,10 @@ def setup_chinese_font():
                     plt.rcParams['font.sans-serif'] = [font_name] + [f for f in plt.rcParams['font.sans-serif'] if f != font_name]
                     matplotlib.rcParams['font.sans-serif'] = [font_name] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != font_name]
                     return font_name
-            
-            # 如果找不到中文字体，尝试下载或使用备选方案
-            # 在 Streamlit Cloud 环境中，可能需要安装字体包
-            # 这里我们使用一个通用的解决方案：使用支持 Unicode 的字体
-            unicode_fonts = ['DejaVu Sans', 'Liberation Sans', 'Arial Unicode MS']
-            for font_name in unicode_fonts:
-                if font_name in font_list:
-                    plt.rcParams['font.sans-serif'] = [font_name] + [f for f in plt.rcParams['font.sans-serif'] if f != font_name]
-                    matplotlib.rcParams['font.sans-serif'] = [font_name] + [f for f in matplotlib.rcParams['font.sans-serif'] if f != font_name]
-                    return font_name
         
-        # 如果都找不到，至少确保设置了字体列表
-        if not any('SimHei' in f or 'YaHei' in f or 'WenQuanYi' in f or 'Noto' in f for f in plt.rcParams['font.sans-serif']):
-            # 添加一些可能支持中文的字体到列表
-            plt.rcParams['font.sans-serif'].insert(0, 'DejaVu Sans')
-            matplotlib.rcParams['font.sans-serif'].insert(0, 'DejaVu Sans')
+        # 如果都找不到，使用 DejaVu Sans（至少能显示部分字符）
+        plt.rcParams['font.sans-serif'].insert(0, 'DejaVu Sans')
+        matplotlib.rcParams['font.sans-serif'].insert(0, 'DejaVu Sans')
         
         return None
     except Exception as e:
@@ -953,6 +977,33 @@ def add_pvalue_text(ax, p_val, x_pos, y_max, fontsize, show_pvalue=True, groups=
            family='sans-serif')  # 明确指定字体族
 
 # ==================== 图形美化主题设置函数 ====================
+def get_plot_title(title_chinese, title_english):
+    """根据字体支持情况返回合适的标题"""
+    # 在 Streamlit Cloud（Linux）环境中，默认使用英文标题以避免方框
+    # 只有在 Windows 系统且找到明确的中文字体时才使用中文
+    try:
+        # 检查是否在 Linux 系统（Streamlit Cloud 通常是 Linux）
+        if platform.system() == 'Linux':
+            # 只有在明确找到中文字体时才使用中文
+            if CHINESE_FONT_NAME_PLOT:
+                chinese_font_keywords = ['SimHei', 'YaHei', 'SimSun', 'KaiTi', 'FangSong', 
+                                        'WenQuanYi', 'Noto', 'Source Han', 'Droid Sans Fallback', 'CJK']
+                if any(keyword in str(CHINESE_FONT_NAME_PLOT) for keyword in chinese_font_keywords):
+                    return title_chinese
+            # Linux 系统中默认使用英文
+            return title_english
+        
+        # Windows 系统：如果找到中文字体，使用中文
+        if platform.system() == 'Windows':
+            if CHINESE_FONT_NAME_PLOT:
+                return title_chinese
+        
+        # 其他情况默认使用英文
+        return title_english
+    except:
+        # 如果检测失败，默认使用英文以确保能正常显示
+        return title_english
+
 def ensure_chinese_font():
     """确保中文字体已正确设置，在每次绘图前调用"""
     try:
@@ -2160,7 +2211,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                         ax.set_xticklabels(groups)
                         ax.set_xlabel(group_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel(value_col, fontsize=adjusted_fontsize)
-                        ax.set_title("箱线图", fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("箱线图", "Box Plot"), fontsize=adjusted_fontsize+1)
                         # 应用坐标轴设置
                         apply_axis_settings(ax, 
                                            x_scale=st.session_state.get('x_scale', "线性"),
@@ -2205,7 +2256,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                         ax.set_xticklabels(groups)
                         ax.set_xlabel(group_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel(value_col, fontsize=adjusted_fontsize)
-                        ax.set_title("小提琴图", fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("小提琴图", "Violin Plot"), fontsize=adjusted_fontsize+1)
                         # 应用坐标轴设置
                         apply_axis_settings(ax, 
                                            x_scale=st.session_state.get('x_scale', "线性"),
@@ -2250,7 +2301,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                         ax.set_xticklabels(groups)
                         ax.set_xlabel(group_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel(value_col, fontsize=adjusted_fontsize)
-                        ax.set_title("条形图" + ("（带误差线）" if errs is not None else ""), fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("条形图" + ("（带误差线）" if errs is not None else ""), "Bar Plot" + (" (with Error Bars)" if errs is not None else "")), fontsize=adjusted_fontsize+1)
                         # 应用坐标轴设置
                         apply_axis_settings(ax, 
                                            x_scale=st.session_state.get('x_scale', "线性"),
@@ -2270,7 +2321,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                             ax.hist(data, alpha=0.6, label=str(g), color=colors[i % len(colors)], bins=15)
                         ax.set_xlabel(value_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel("频数", fontsize=adjusted_fontsize)
-                        ax.set_title("直方图", fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("直方图", "Histogram"), fontsize=adjusted_fontsize+1)
                         if show_legend:
                             ax.legend(fontsize=adjusted_fontsize-1)
                         # 应用坐标轴设置
@@ -2293,7 +2344,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                             sns.kdeplot(data=data, ax=ax, label=str(g), color=colors[i % len(colors)], linewidth=linewidth*1.5)
                         ax.set_xlabel(value_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel("密度", fontsize=adjusted_fontsize)
-                        ax.set_title("密度曲线图", fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("密度曲线图", "Density Curve"), fontsize=adjusted_fontsize+1)
                         if show_legend:
                             ax.legend(fontsize=adjusted_fontsize-1)
                         # 应用坐标轴设置
@@ -2328,7 +2379,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                         ax.set_xticklabels(groups)
                         ax.set_xlabel(group_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel(value_col, fontsize=adjusted_fontsize)
-                        ax.set_title("点图" + ("（带误差线）" if errs is not None else ""), fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("点图" + ("（带误差线）" if errs is not None else ""), "Dot Plot" + (" (with Error Bars)" if errs is not None else "")), fontsize=adjusted_fontsize+1)
                         
                         # 应用坐标轴设置
                         apply_axis_settings(ax, 
@@ -2501,7 +2552,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                         ax.set_xticklabels(groups, rotation=45)
                         ax.set_xlabel(group_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel(value_col, fontsize=adjusted_fontsize)
-                        ax.set_title("多组箱线图", fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("多组箱线图", "Multi-group Box Plot"), fontsize=adjusted_fontsize+1)
                         # 应用坐标轴设置
                         apply_axis_settings(ax, 
                                            x_scale=st.session_state.get('x_scale', "线性"),
@@ -2546,7 +2597,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                         ax.set_xticklabels(groups, rotation=45)
                         ax.set_xlabel(group_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel(value_col, fontsize=adjusted_fontsize)
-                        ax.set_title("多组小提琴图", fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("多组小提琴图", "Multi-group Violin Plot"), fontsize=adjusted_fontsize+1)
                         # 应用坐标轴设置
                         apply_axis_settings(ax, 
                                            x_scale=st.session_state.get('x_scale', "线性"),
@@ -2589,7 +2640,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                         ax.set_xticklabels(groups, rotation=45)
                         ax.set_xlabel(group_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel(value_col, fontsize=adjusted_fontsize)
-                        ax.set_title("多组条形图" + ("（带误差线）" if errs is not None else ""), fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("多组条形图" + ("（带误差线）" if errs is not None else ""), "Multi-group Bar Plot" + (" (with Error Bars)" if errs is not None else "")), fontsize=adjusted_fontsize+1)
                         # 应用坐标轴设置
                         apply_axis_settings(ax, 
                                            x_scale=st.session_state.get('x_scale', "线性"),
@@ -2609,7 +2660,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                             ax.hist(data, alpha=0.6, label=str(g), color=colors[i % len(colors)], bins=15)
                         ax.set_xlabel(value_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel("频数", fontsize=adjusted_fontsize)
-                        ax.set_title("多组直方图", fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("多组直方图", "Multi-group Histogram"), fontsize=adjusted_fontsize+1)
                         if show_legend:
                             ax.legend(fontsize=adjusted_fontsize-1)
                         # 应用坐标轴设置
@@ -2632,7 +2683,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                             sns.kdeplot(data=data, ax=ax, label=str(g), color=colors[i % len(colors)], linewidth=linewidth*1.5)
                         ax.set_xlabel(value_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel("密度", fontsize=adjusted_fontsize)
-                        ax.set_title("多组密度曲线图", fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("多组密度曲线图", "Multi-group Density Curve"), fontsize=adjusted_fontsize+1)
                         if show_legend:
                             ax.legend(fontsize=adjusted_fontsize-1)
                         # 应用坐标轴设置
@@ -2667,7 +2718,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                         ax.set_xticklabels(groups, rotation=45)
                         ax.set_xlabel(group_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel(value_col, fontsize=adjusted_fontsize)
-                        ax.set_title("多组点图（带误差线）", fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("多组点图（带误差线）", "Multi-group Dot Plot (with Error Bars)"), fontsize=adjusted_fontsize+1)
                         # 应用坐标轴设置
                         apply_axis_settings(ax, 
                                            x_scale=st.session_state.get('x_scale', "线性"),
@@ -2787,7 +2838,8 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                         ax.scatter(df[col_x], df[col_y], alpha=0.6, s=pointsize, color=colors[0], edgecolors='black', linewidths=0.5)
                         ax.set_xlabel(col_x, fontsize=adjusted_fontsize)
                         ax.set_ylabel(col_y, fontsize=adjusted_fontsize)
-                        ax.set_title(f"散点图（{result['method_name']}）", fontsize=adjusted_fontsize+1)
+                        method_name_en = result.get('method_name_en', result['method_name'])
+                        ax.set_title(get_plot_title(f"散点图（{result['method_name']}）", f"Scatter Plot ({method_name_en})"), fontsize=adjusted_fontsize+1)
                         # 应用坐标轴设置
                         apply_axis_settings(ax, 
                                            x_scale=st.session_state.get('x_scale', "线性"),
@@ -2833,7 +2885,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                             ax.hexbin(df[col_x], df[col_y], gridsize=20, cmap='Blues', mincnt=1)
                             ax.set_xlabel(col_x, fontsize=adjusted_fontsize)
                             ax.set_ylabel(col_y, fontsize=adjusted_fontsize)
-                            ax.set_title("六边形密度图", fontsize=adjusted_fontsize+1)
+                            ax.set_title(get_plot_title("六边形密度图", "Hexbin Density Plot"), fontsize=adjusted_fontsize+1)
                             plt.colorbar(ax.collections[0], ax=ax)
                             # 应用坐标轴设置
                             apply_axis_settings(ax, 
@@ -2850,7 +2902,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                                 ax.hist(data, alpha=0.6, label=col, color=colors[i], bins=20, density=True)
                             ax.set_xlabel("数值", fontsize=fontsize)
                             ax.set_ylabel("密度", fontsize=fontsize)
-                            ax.set_title("密度分布图", fontsize=fontsize+1)
+                            ax.set_title(get_plot_title("密度分布图", "Density Distribution"), fontsize=fontsize+1)
                             if show_legend:
                                 ax.legend(fontsize=fontsize-1)
                     
@@ -2959,7 +3011,7 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                                  edgecolors='black', linewidths=0.5, label="数据点")
                         ax.set_xlabel(x_col, fontsize=adjusted_fontsize)
                         ax.set_ylabel(y_col, fontsize=adjusted_fontsize)
-                        ax.set_title("简单线性回归", fontsize=adjusted_fontsize+1)
+                        ax.set_title(get_plot_title("简单线性回归", "Simple Linear Regression"), fontsize=adjusted_fontsize+1)
                         # 应用坐标轴设置
                         apply_axis_settings(ax, 
                                            x_scale=st.session_state.get('x_scale', "线性"),
@@ -3052,6 +3104,31 @@ if st.session_state.current_df is not None and st.session_state.current_task:
                     # 保存图形用于PDF生成
                     st.session_state.current_fig = fig
                     plt.close()
+            
+            # 图形优化设置（默认折叠）- 在所有绘图完成后统一显示
+            if st.session_state.current_fig is not None:
+                with st.expander("🎨 图形优化设置", expanded=False):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.session_state.plot_fontsize = st.slider("字体大小", 6, 20, st.session_state.plot_fontsize, 1)
+                        st.session_state.plot_linewidth = st.slider("线条宽度", 0.1, 3.0, st.session_state.plot_linewidth, 0.1)
+                        st.session_state.plot_pointsize = st.slider("点大小", 10, 200, st.session_state.plot_pointsize, 10)
+                        st.session_state.plot_show_legend = st.checkbox("显示图例", st.session_state.plot_show_legend)
+                    with col2:
+                        st.session_state.plot_theme = st.selectbox("主题风格", 
+                            ["自然风格（Nature-like）", "简洁风格（Minimal）", "学术风格（Academic）", "现代风格（Modern）"],
+                            index=["自然风格（Nature-like）", "简洁风格（Minimal）", "学术风格（Academic）", "现代风格（Modern）"].index(st.session_state.plot_theme) if st.session_state.plot_theme in ["自然风格（Nature-like）", "简洁风格（Minimal）", "学术风格（Academic）", "现代风格（Modern）"] else 0)
+                        st.session_state.plot_color_scheme = st.selectbox("颜色方案",
+                            ["蓝色系", "绿色系", "橙色系", "紫色系", "灰色系"],
+                            index=["蓝色系", "绿色系", "橙色系", "紫色系", "灰色系"].index(st.session_state.plot_color_scheme) if st.session_state.plot_color_scheme in ["蓝色系", "绿色系", "橙色系", "紫色系", "灰色系"] else 0)
+                        st.session_state.plot_width = st.number_input("图形宽度（英寸）", 3.0, 12.0, st.session_state.plot_width, 0.5)
+                        st.session_state.plot_height = st.number_input("图形高度（英寸）", 3.0, 12.0, st.session_state.plot_height, 0.5)
+                        st.session_state.plot_aspect = st.selectbox("图形比例",
+                            ["宽", "正方形", "高"],
+                            index=["宽", "正方形", "高"].index(st.session_state.plot_aspect) if st.session_state.plot_aspect in ["宽", "正方形", "高"] else 1)
+                    # 如果设置改变，重新绘制图形
+                    if st.button("🔄 应用设置并重新绘制", use_container_width=True):
+                        st.rerun()
             
             # 统计结果展示
             if st.session_state.current_results:
